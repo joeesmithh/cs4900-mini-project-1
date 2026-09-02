@@ -2,6 +2,13 @@
 
 A speech-controlled desktop application that guides visually impaired users to photograph an object and place it in a specific region of the frame. The user interacts entirely via voice; the app responds with spoken guidance and triggers the capture automatically.
 
+## Documentation
+
+| Document                     | Link                                                |
+| ---------------------------- | --------------------------------------------------- |
+| Project description          | [cs4900_project_01.md](./docs/cs4900_project_01.md) |
+| Object detection information | [object_detection.md](./docs/object_detection.md)   |
+
 ## Requirements
 
 - Python 3.10+
@@ -40,7 +47,7 @@ When prompted, speak the name of an object (e.g. `bottle`, `cup`, `laptop`) and 
 
 Test individual components in isolation:
 
-| Component | Description | Argument | Full Command |
-| -| -|-|-|
-| Text-to-speech | Type text to hear it spoken | `--debug-tts` | `python main.py --debug-tts` |
-| Speech-to-text | Speak in microphone to see transcript | `--debug-stt` | `python main.py --debug-stt`|
+| Component      | Description                           | Argument      | Full Command                 |
+| -------------- | ------------------------------------- | ------------- | ---------------------------- |
+| Text-to-speech | Type text to hear it spoken           | `--debug-tts` | `python main.py --debug-tts` |
+| Speech-to-text | Speak in microphone to see transcript | `--debug-stt` | `python main.py --debug-stt` |

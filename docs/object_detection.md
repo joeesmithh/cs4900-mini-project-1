@@ -11,7 +11,6 @@ The following is an example and code snippet pertaining to object detection prov
 | Source Image             | Detections                   |
 | ------------------------ | ---------------------------- |
 | ![](./images/source.jpg) | ![](./images/detections.jpg) |
-|                          |                              |
 
 ### Snippet
 
