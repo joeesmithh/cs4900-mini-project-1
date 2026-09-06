@@ -49,5 +49,5 @@ Test individual components in isolation:
 
 | Component      | Description                           | Argument      | Full Command                 |
 | -------------- | ------------------------------------- | ------------- | ---------------------------- |
-| Text-to-speech | Type text to hear it spoken           | `--debug-tts` | `python main.py --debug-tts` |
-| Speech-to-text | Speak in microphone to see transcript | `--debug-stt` | `python main.py --debug-stt` |
+| Text-to-speech | Type text to hear it spoken           | `--tts` | `python main.py --tts` |
+| Speech-to-text | Speak in microphone to see transcript | `--stt` | `python main.py --stt` |
