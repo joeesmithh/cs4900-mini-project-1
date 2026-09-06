@@ -8,7 +8,7 @@ class SpeechIO:
         self._engine = pyttsx3.init()
         self._engine.setProperty("rate", rate)
         self._engine.setProperty("volume", volume)
-        self._engine.startLoop(False) # Start engine loop in non-blocking mode
+        self._engine.startLoop(False)  # Start engine loop in non-blocking mode
 
         # Initialize STT engine
         self._recognizer = sr.Recognizer()
@@ -17,7 +17,7 @@ class SpeechIO:
         with self._mic as source:
             self._recognizer.adjust_for_ambient_noise(source, duration=1)
         print("Ready.")
-    
+
     def __del__(self):
         """End TTS loop on object deletion."""
         self._engine.endLoop()

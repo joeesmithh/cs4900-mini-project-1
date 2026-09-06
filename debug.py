@@ -1,9 +1,4 @@
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from speech_io import SpeechIO
+from speech_io import SpeechIO
 
 
 def debug_tts(sio: SpeechIO) -> None:

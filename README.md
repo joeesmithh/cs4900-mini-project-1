@@ -8,6 +8,7 @@ A speech-controlled desktop application that guides visually impaired users to p
 | ---------------------------- | --------------------------------------------------- |
 | Project description          | [cs4900_project_01.md](./docs/cs4900_project_01.md) |
 | Object detection information | [object_detection.md](./docs/object_detection.md)   |
+| Pipeline flowchart           | [pipeline.md](./docs/pipeline.md)                   |
 
 ## Requirements
 
@@ -41,13 +42,18 @@ python3 -m pip install -r requirements.txt
 python3 main.py
 ```
 
+| Mode              | Description                                                                         | Argument | Full Command           |
+| ----------------- | ----------------------------------------------------------------------------------- | -------- | ---------------------- |
+| Headless (no GUI) | Run the program with in default speech interaction mode                             | —        | `python main.py`       |
+| Live camera view  | Run the program with speech interaction + live camera and capture view side-by-side | `--gui`  | `python main.py --gui` |
+
 When prompted, speak the name of an object (e.g. `bottle`, `cup`, `laptop`) and a target zone (`top left`, `top right`, `bottom left`, `bottom right`, or `center`). The app will guide you with spoken directions until the object is positioned correctly, then take the photo automatically. Captures are saved to `captures/`.
 
 ## Debug Modes
 
 Test individual components in isolation:
 
-| Component      | Description                           | Argument      | Full Command                 |
-| -------------- | ------------------------------------- | ------------- | ---------------------------- |
-| Text-to-speech | Type text to hear it spoken           | `--tts` | `python main.py --tts` |
-| Speech-to-text | Speak in microphone to see transcript | `--stt` | `python main.py --stt` |
+| Component      | Description                           | Argument | Full Command           |
+| -------------- | ------------------------------------- | -------- | ---------------------- |
+| Text-to-speech | Type text to hear it spoken           | `--tts`  | `python main.py --tts` |
+| Speech-to-text | Speak in microphone to see transcript | `--stt`  | `python main.py --stt` |
