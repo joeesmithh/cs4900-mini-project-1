@@ -18,11 +18,6 @@ def debug_stt(sio: SpeechIO) -> None:
     print("STT debug (speak into your microphone. Ctrl+C to quit.)")
     try:
         while True:
-            print("Listening...")
-            result = sio.listen()
-            if result:
-                print(f"Heard: {result}")
-            else:
-                print("(nothing recognized)")
+            sio.listen()
     except KeyboardInterrupt:
         print("\nExiting STT debug.")

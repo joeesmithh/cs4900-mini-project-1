@@ -219,10 +219,14 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+# Object detection
+*.pt
+
 # Project
 .*/
+notebooks/
 
-# Ignore all .md files except for anything under docs/ and README.md 
+# Ignore all .md files except for README.md and anything under docs/
 *.md
 !README.md
 !docs/*.md

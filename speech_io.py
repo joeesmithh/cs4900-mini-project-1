@@ -3,7 +3,10 @@ import speech_recognition as sr
 
 
 class SpeechIO:
-    def __init__(self, rate: int = 200, volume: float = 1.0, mic_index: int | None = None):
+    def __init__(self,
+                 rate: int = 150,
+                 volume: float = 1.0,
+                 mic_index: int | None = None) -> "SpeechIO":
         # Initialize TTS engine
         self._engine = pyttsx3.init()
         self._engine.setProperty("rate", rate)
@@ -29,17 +32,21 @@ class SpeechIO:
             self._engine.iterate()
         print(f"[TTS] {text}")
 
-    def listen(self, timeout: int | None = None, phrase_limit: int = 8) -> str | None:
+    def listen(self,
+               timeout: int | None = None,
+               phrase_limit: int | None = None) -> str | None:
+        print("Listening...")
         with self._mic as source:
             try:
                 audio = self._recognizer.listen(source=source,
                                                 timeout=timeout,
                                                 phrase_time_limit=phrase_limit)
-                return self._recognizer.recognize_google(audio).lower()
-            except sr.WaitTimeoutError:
-                return None
-            except sr.UnknownValueError:
-                return None
+                result = self._recognizer.recognize_google(audio).lower()
+                print(f"Heard: {result}")
+                return result
             except sr.RequestError as e:
                 print(f"[STT] Google Speech API error: {e}")
+                return None
+            except Exception:
+                print("Nothing recognized...")
                 return None
