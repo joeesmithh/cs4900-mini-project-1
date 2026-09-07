@@ -14,13 +14,21 @@ ARGS = [
     ("--gui", "Visualize the capture and detections side-by-side")
 ]
 
+# Screen regions
+REGIONS = [
+    "top left",
+    "top right",
+    "bottom left",
+    "bottom right",
+    "center"
+]
+
 # Collection of TTS phrases
-
-
 class Phrases(StrEnum):
     LIST_OBJECTS = "The detected objects were "
     PROMPT_CHOOSE_OBJECT = "Which object would you like to frame?"
     INVALID_RESPONSE = "Invalid response. Try again."
+    PROMPT_CHOOSE_REGION = "Choose a region in which to frame the "
 
 
 def get_args() -> Namespace:
@@ -62,19 +70,22 @@ def main() -> None:
     objects = ["apple", "banana", "cup"]  # Placeholder detection list
     sio.speak(Phrases.LIST_OBJECTS + ", ".join(objects))
 
-    # 4. Ask user which object to frame
+    # 4. Ask object choice
     sio.speak(Phrases.PROMPT_CHOOSE_OBJECT)
 
-    # 5. Wait for user response
-    result = sio.listen()
+    # 5. Get user object choice
+    result = sio.make_choice(choices=objects,
+                             invalid_response=Phrases.INVALID_RESPONSE)
 
-    # Listen while result invalid or any word in spoken phrase is not in objects
-    while result is None or not any(item in objects for item in result.split(" ")):
-        sio.speak(Phrases.INVALID_RESPONSE)
-        result = sio.listen()
+    # 6. Ask object framing
+    sio.speak(Phrases.PROMPT_CHOOSE_REGION +
+              result + ": " + ", ".join(REGIONS))
 
-    # TODO: 6. Ask object framing
-    # TODO: 7. Wait for user response
+    # 7. Get user framing region choice
+    result = sio.make_choice(choices=REGIONS,
+                             invalid_response=Phrases.INVALID_RESPONSE)
+    sio.speak(f"You chose: {result}")
+
     # TODO: 8. Calculate object area % in frame
     # TODO: 9. Calculate camera movement direction
     # TODO: 10. Instruct user where to move camera

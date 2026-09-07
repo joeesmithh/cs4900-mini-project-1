@@ -50,3 +50,17 @@ class SpeechIO:
             except Exception:
                 print("Nothing recognized...")
                 return None
+
+    def make_choice(self,
+                    choices: list[str],
+                    invalid_response: str,
+                    timeout: int | None = None,
+                    phrase_limit: int | None = None) -> str:
+        """Listen while spoken phrase invalid or any word in spoken phrase is
+        not in list of choices. Return the first occurring phrase in spoken
+        phrase present in list of phrase choices."""
+        result = self.listen(timeout, phrase_limit)
+        while result is None or not any(item in result for item in choices):
+            self.speak(invalid_response)
+            result = self.listen(timeout, phrase_limit)
+        return next((item for item in choices if item in result), "")
