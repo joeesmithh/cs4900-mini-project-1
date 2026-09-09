@@ -9,32 +9,81 @@ A speech-controlled desktop application that guides visually impaired users to p
 | Project description          | [cs4900_project_01.md](./docs/cs4900_project_01.md) |
 | Object detection information | [object_detection.md](./docs/object_detection.md)   |
 | Pipeline flowchart           | [pipeline.md](./docs/pipeline.md)                   |
+| Speech I/O reference         | [speech_io.md](./docs/speech_io.md)                 |
 
 ## Requirements
 
 - Python 3.10+
 - Working microphone and speakers
-- Internet connection (Google Speech API + first-run YOLOv8 model download)
+- `ffmpeg` available on the system `PATH` (used by OpenAI Whisper)
+- Internet connection for the first run only (downloads the Whisper `base` model,
+  ~140 MB, and the YOLOv8 model). Speech recognition then runs fully offline.
+
+## System dependencies (ffmpeg)
+
+OpenAI's Whisper requires the `ffmpeg` binary on your `PATH`.
+
+### Windows
+
+```powershell
+winget install --id=Gyan.FFmpeg -e
+```
+
+### macOS
+
+```bash
+brew install ffmpeg
+```
+
+### Linux (Debian / Ubuntu)
+
+```bash
+sudo apt install ffmpeg
+```
+
+Verify installation with `ffmpeg -version`
 
 ## Installation
 
 ### Windows
 
 ```powershell
+# Initialize virtual environment
 python -m venv .venv
+
+# Activate virtual environment
 .\.venv\Scripts\activate
+
+# Update Python package manager
 python -m pip install --upgrade pip
+
+# Install PyTorch (CPU build) for Whisper and Ultralytics
+python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+# Install remaining requirements
 python -m pip install -r requirements.txt
 ```
 
 ### macOS / Linux
 
 ```bash
+# Initialize virtual environment
 python3 -m venv .venv
+
+# Activate virtual environment
 source .venv/bin/activate
+
+# Update Python package manager
 python3 -m pip install --upgrade pip
+
+# Install PyTorch (CPU build) for Whisper and Ultralytics
+python3 -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+# Install remaining requirements
 python3 -m pip install -r requirements.txt
 ```
+
+The explicit `torch` line installs the smaller size CPU-only PyTorch build, which is plenty for the Whisper `base` model on short voice commands.
 
 ## Usage
 
@@ -47,7 +96,7 @@ python3 main.py
 | Headless (no GUI) | Run the program with in default speech interaction mode                             | —        | `python main.py`       |
 | Live camera view  | Run the program with speech interaction + live camera and capture view side-by-side | `--gui`  | `python main.py --gui` |
 
-When prompted, speak the name of an object (e.g. `bottle`, `cup`, `laptop`) and a target zone (`top left`, `top right`, `bottom left`, `bottom right`, or `center`). The app will guide you with spoken directions until the object is positioned correctly, then take the photo automatically. Captures are saved to `captures/`.
+The first launch pauses briefly to download (first run only) and load the Whisper `base` model. When prompted, speak the name of an object (e.g. "bottle", "cup", "laptop") and a target zone ("top left", "top right", "bottom left", "bottom right", or "center"). The app will guide you with spoken directions until the object is positioned correctly, then take the photo automatically. Captures are saved to `captures/`.
 
 ## Debug Modes
 
