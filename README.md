@@ -9,7 +9,6 @@ A speech-controlled desktop application that guides visually impaired users to p
 | Project description          | [cs4900_project_01.md](./docs/cs4900_project_01.md) |
 | Object detection information | [object_detection.md](./docs/object_detection.md)   |
 | Pipeline flowchart           | [pipeline.md](./docs/pipeline.md)                   |
-| Speech I/O reference         | [speech_io.md](./docs/speech_io.md)                 |
 
 ## Requirements
 
