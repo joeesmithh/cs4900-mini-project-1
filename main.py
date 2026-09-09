@@ -2,6 +2,7 @@ import argparse
 import camera
 import debug
 import cv2
+from detector import Detector
 from speech_io import SpeechIO
 from argparse import Namespace  # Type hinting for argparse arguments
 from cv2.typing import MatLike  # Type hinting for cv2 images and matrices
@@ -11,6 +12,7 @@ from enum import StrEnum
 ARGS = [
     ("--tts", "Test TTS: type text, hear it spoken"),
     ("--stt", "Test STT: speak, see transcript printed"),
+    ("--detect", "Test detection: live webcam with YOLO boxes side-by-side"),
     ("--gui", "Visualize the capture and detections side-by-side")
 ]
 
@@ -24,6 +26,8 @@ REGIONS = [
 ]
 
 # Collection of TTS phrases
+
+
 class Phrases(StrEnum):
     LIST_OBJECTS = "The detected objects were "
     PROMPT_CHOOSE_OBJECT = "Which object would you like to frame?"
@@ -45,13 +49,17 @@ def get_args() -> Namespace:
 
 def main() -> None:
 
-    sio: SpeechIO = SpeechIO()
-
     # Debug
     # -------------------------------------------------------------------------
 
     # Debug modes: each runs in isolation and skips the main pipeline.
     args: Namespace = get_args()
+
+    if args.detect:
+        debug.debug_detect(Detector())
+        return
+
+    sio: SpeechIO = SpeechIO()
     if args.tts or args.stt:
         if args.tts:
             debug.debug_tts(sio)

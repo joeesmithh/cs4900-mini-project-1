@@ -101,7 +101,8 @@ The first launch pauses briefly to download (first run only) and load the Whispe
 
 Test individual components in isolation:
 
-| Component      | Description                           | Argument | Full Command           |
-| -------------- | ------------------------------------- | -------- | ---------------------- |
-| Text-to-speech | Type text to hear it spoken           | `--tts`  | `python main.py --tts` |
-| Speech-to-text | Speak in microphone to see transcript | `--stt`  | `python main.py --stt` |
+| Component        | Description                           | Argument   | Full Command              |
+| ---------------- | ------------------------------------- | ---------- | ------------------------- |
+| Text-to-speech   | Type text to hear it spoken           | `--tts`    | `python main.py --tts`    |
+| Speech-to-text   | Speak in microphone to see transcript | `--stt`    | `python main.py --stt`    |
+| Object detection | YOLO-annotated detection feed         | `--detect` | `python main.py --detect` |

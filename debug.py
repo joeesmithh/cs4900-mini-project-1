@@ -1,3 +1,7 @@
+import cv2
+import numpy as np
+from camera import CAMERA_INDEX
+from detector import Detector
 from speech_io import SpeechIO
 
 
@@ -21,3 +25,33 @@ def debug_stt(sio: SpeechIO) -> None:
             sio.listen()
     except KeyboardInterrupt:
         print("\nExiting STT debug.")
+
+
+def debug_detect(detector: Detector) -> None:
+    """Live webcam loop: showsYOLO's annotated frame, refreshed as
+    fast as the CPU can run it. Press 'q' or Esc in the window to quit.
+    """
+    # Open the camera once and hold it for the whole loop (unlike
+    # camera.capture_image(), which reopens it every call).
+    cap = cv2.VideoCapture(CAMERA_INDEX)
+    if not cap.isOpened():
+        raise RuntimeError(
+            f"Error: could not open camera at index {CAMERA_INDEX}!")
+
+    print("Detection debug (press 'q' or Esc in the window to quit).")
+    try:
+        while True:
+            ok, frame = cap.read()
+            if not ok or frame is None:
+                break
+
+            result = detector.detect(frame)
+            annotated = result.plot()  # BGR frame with boxes + labels drawn
+
+            cv2.imshow("Detections  (press q to quit)", annotated)
+
+            if cv2.waitKey(1) & 0xFF in (ord("q"), 27):  # 27 = Esc
+                break
+    finally:
+        cap.release()
+        cv2.destroyAllWindows()
