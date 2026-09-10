@@ -50,14 +50,14 @@ class Camera:
                         frame_height // 2 + frame_height)]
         }
     
-    def _get_image(self, capture: cv2.VideoCapture) -> cv2.typing.MatLike:
+    def _get_image(self, capture: cv2.VideoCapture) -> MatLike:
         """Capture and validate an image"""
         ok, captured = capture.read()
         if not ok or captured is None:
             raise RuntimeError("Failed to read a frame from the camera")
         return captured
         
-    def capture_image(self) -> cv2.typing.MatLike:
+    def capture_image(self) -> MatLike:
         """Take a webcam photo."""
         # Discard a few frames so exposure and white balance can settle
         for _ in range(5):
@@ -66,7 +66,7 @@ class Camera:
         # Capture image
         return self._get_image(self._capture)
 
-    def capture_with_regions(self) -> cv2.typing.MatLike:
+    def capture_with_regions(self) -> MatLike:
         """Take a photo and return it with every named region drawn on top.
         Each region rectangle is labelled with its name; the overlapping.
         """
