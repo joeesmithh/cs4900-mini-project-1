@@ -3,6 +3,7 @@ import numpy as np
 import pyttsx3
 import speech_recognition as sr
 import whisper
+from pathlib import Path
 
 # Create translation table mapping "" to "" and completely remove
 # punctuation symbols. Needed for stripping Whisper translations
@@ -47,7 +48,8 @@ class SpeechIO:
         self._recognizer = sr.Recognizer()
         self._mic = sr.Microphone(device_index=mic_index)
         print(f"Loading Whisper model ({model_name})...")
-        self._model = whisper.load_model(model_name)
+        script_dir = Path(__file__).parent.resolve()
+        self._model = whisper.load_model(model_name, download_root=str(script_dir))
         print("Calibrating for ambient noise...")
         with self._mic as source:
             self._recognizer.adjust_for_ambient_noise(source, duration=1)
