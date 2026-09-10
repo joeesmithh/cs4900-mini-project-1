@@ -13,7 +13,8 @@ ARGS = [
     ("--tts", "Test TTS: type text, hear it spoken"),
     ("--stt", "Test STT: speak, see transcript printed"),
     ("--detect", "Test detection: live webcam with YOLO boxes side-by-side"),
-    ("--gui", "Visualize the capture and detections side-by-side")
+    ("--gui", "Visualize the capture and detections side-by-side"),
+    ("--voices", "Listen to pyttsx3 voices")
 ]
 
 # Screen regions
@@ -44,6 +45,10 @@ def get_args() -> Namespace:
         group.add_argument(arg,
                            action="store_true",
                            help=help)
+    parser.add_argument("--voice",
+                        type=int,
+                        default=1,
+                        help="pyttsx3 voice index for TTS output (see --voices)")
     return parser.parse_args()
 
 
@@ -59,12 +64,14 @@ def main() -> None:
         debug.debug_detect(Detector())
         return
 
-    sio: SpeechIO = SpeechIO()
-    if args.tts or args.stt:
+    sio: SpeechIO = SpeechIO(voice_index=args.voice)
+    if args.tts or args.stt or args.voices:
         if args.tts:
             debug.debug_tts(sio)
         elif args.stt:
             debug.debug_stt(sio)
+        elif args.voices:
+            sio.list_voices()
         return
 
     # Main pipeline
