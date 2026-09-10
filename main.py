@@ -1,8 +1,10 @@
 import argparse
+import time
 import camera
 import debug
 import cv2
-from detector import Detector
+import framing
+from detector import Detector, parse_detections
 from speech_io import SpeechIO
 from argparse import Namespace  # Type hinting for argparse arguments
 from cv2.typing import MatLike  # Type hinting for cv2 images and matrices
@@ -26,6 +28,20 @@ REGIONS = [
     "center"
 ]
 
+# Seconds before an unchanged instruction is spoken again, so the user hears
+# reassurance without a wall of speech.
+REPEAT_SECONDS = 3.0
+
+# Frames dropped after speaking, since the camera keeps buffering while TTS
+# blocks and the stale frames no longer show where the camera is pointing.
+FLUSH_FRAMES = 5
+
+# Consecutive failed camera reads tolerated before giving up on the feed.
+MAX_READ_FAILURES = 30
+
+# Where the framed photograph is written.
+OUTPUT_FILE = "capture.jpg"
+
 # Collection of TTS phrases
 
 
@@ -34,6 +50,10 @@ class Phrases(StrEnum):
     PROMPT_CHOOSE_OBJECT = "Which object would you like to frame?"
     INVALID_RESPONSE = "Invalid response. Try again."
     PROMPT_CHOOSE_REGION = "Choose a region in which to frame the "
+    NO_OBJECTS = "I could not detect any objects. Please try again."
+    OBJECT_LOST = "I cannot see the "
+    FRAMED = "Got it. Taking the picture."
+    SAVED = "Picture saved."
 
 
 def get_args() -> Namespace:
@@ -50,6 +70,66 @@ def get_args() -> Namespace:
                         default=1,
                         help="pyttsx3 voice index for TTS output (see --voices)")
     return parser.parse_args()
+
+
+def guide_to_frame(cap: cv2.VideoCapture,
+                   detector: Detector,
+                   sio: SpeechIO,
+                   label: str,
+                   region_name: str,
+                   show_gui: bool = False) -> MatLike | None:
+    """Speak movement instructions until `label` sits inside `region_name`.
+
+    Runs detection continuously rather than capturing, moving, and recapturing:
+    the user hears a correction the moment the camera drifts. Returns the frame
+    the object was framed in, or None if the user quit the GUI window.
+    """
+    last_said: str | None = None
+    last_time = 0.0
+    failures = 0
+
+    while True:
+        ok, frame = cap.read()
+        if not ok or frame is None:
+            # A dropped frame is normal; a dead feed is not.
+            failures += 1
+            if failures > MAX_READ_FAILURES:
+                raise RuntimeError("Lost the camera feed while guiding")
+            continue
+        failures = 0
+
+        # Read the size from the frame itself: the webcam may not have given
+        # us the resolution we asked for.
+        height, width = frame.shape[:2]
+        region = framing.region_bbox(region_name, width, height)
+
+        # Several cups may be in view; track the one YOLO is surest of.
+        matches = [detection
+                   for detection in parse_detections(detector.detect(frame))
+                   if detection[0] == label]
+        box = max(matches, key=lambda d: d[2])[1] if matches else None
+
+        if box is None:
+            # Motion blur routinely costs a detection or two mid-turn.
+            instruction = Phrases.OBJECT_LOST + label
+        else:
+            instruction = framing.guidance(box, region, width, height)
+
+        if show_gui:
+            debug.show_framing(frame, region, box, instruction)
+            if cv2.waitKey(1) & 0xFF in (ord("q"), 27):  # 27 = Esc
+                return None
+
+        if instruction is None:
+            return frame
+
+        # Speak only when the advice changes, or periodically to reassure.
+        now = time.monotonic()
+        if instruction != last_said or now - last_time > REPEAT_SECONDS:
+            sio.speak(instruction)
+            last_said, last_time = instruction, now
+            for _ in range(FLUSH_FRAMES):
+                cap.grab()
 
 
 def main() -> None:
@@ -77,38 +157,57 @@ def main() -> None:
     # Main pipeline
     # -------------------------------------------------------------------------
 
-    # 1. Capture image
+    detector: Detector = Detector()
 
-    # 2. Detect objects
+    # One handle for the whole run: the initial still and the guidance loop
+    # share it, because the device only streams to one client at a time.
+    cap = camera.open_camera()
+    try:
+        # 1. Capture image
+        frame = camera.read_frame(cap, warmup=camera.WARMUP_FRAMES)
 
-    # 3. List detected objects
-    objects = ["apple", "banana", "cup"]  # Placeholder detection list
-    sio.speak(Phrases.LIST_OBJECTS + ", ".join(objects))
+        # 2. Detect objects
+        detections = parse_detections(detector.detect(frame))
 
-    # 4. Ask object choice
-    sio.speak(Phrases.PROMPT_CHOOSE_OBJECT)
+        # 3. List detected objects, deduplicated but kept in detection order
+        objects = list(dict.fromkeys(label for label, _, _ in detections))
+        if not objects:
+            sio.speak(Phrases.NO_OBJECTS)
+            return
+        sio.speak(Phrases.LIST_OBJECTS + ", ".join(objects))
 
-    # 5. Get user object choice
-    result = sio.make_choice(choices=objects,
-                             invalid_response=Phrases.INVALID_RESPONSE)
+        # 4. Ask object choice
+        sio.speak(Phrases.PROMPT_CHOOSE_OBJECT)
 
-    # 6. Ask object framing
-    sio.speak(Phrases.PROMPT_CHOOSE_REGION +
-              result + ": " + ", ".join(REGIONS))
+        # 5. Get user object choice
+        chosen_object = sio.make_choice(
+            choices=objects, invalid_response=Phrases.INVALID_RESPONSE)
 
-    # 7. Get user framing region choice
-    result = sio.make_choice(choices=REGIONS,
-                             invalid_response=Phrases.INVALID_RESPONSE)
-    sio.speak(f"You chose: {result}")
+        # 6. Ask object framing
+        sio.speak(Phrases.PROMPT_CHOOSE_REGION +
+                  chosen_object + ": " + ", ".join(REGIONS))
 
-    # TODO: 8. Calculate object area % in frame
-    # TODO: 9. Calculate camera movement direction
-    # TODO: 10. Instruct user where to move camera
-    # TODO: 11. Wait for camera movement
-    # TODO: 12. Wait for camera stationary
-    # TODO: 13. Capture Image
-    # TODO: 14. Detect objects
-    # TODO: 15. Is object still in scene?
+        # 7. Get user framing region choice
+        chosen_region = sio.make_choice(
+            choices=REGIONS, invalid_response=Phrases.INVALID_RESPONSE)
+        sio.speak(f"You chose: {chosen_region}")
+
+        # 8-12. Guide the user until the object sits in the chosen region.
+        # Steps 8 through 12 all live inside this loop: it measures coverage,
+        # picks a direction, speaks it, and re-detects on the next frame.
+        framed = guide_to_frame(cap, detector, sio,
+                                chosen_object, chosen_region, args.gui)
+        if framed is None:  # User quit the GUI window
+            return
+
+        # 13. Capture image (the frame the object was framed in)
+        sio.speak(Phrases.FRAMED)
+        cv2.imwrite(OUTPUT_FILE, framed)
+        sio.speak(Phrases.SAVED)
+        print(f"Saved {OUTPUT_FILE}")
+    finally:
+        cap.release()
+        cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
