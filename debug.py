@@ -3,6 +3,7 @@ import numpy as np
 from camera import CAMERA_INDEX
 from detector import Detector
 from speech_io import SpeechIO
+from camera import Camera
 
 
 def debug_tts(sio: SpeechIO) -> None:
@@ -55,3 +56,11 @@ def debug_detect(detector: Detector) -> None:
     finally:
         cap.release()
         cv2.destroyAllWindows()
+
+def debug_camera(camera: Camera):
+    print(f"Camera resolution: {camera.resolution}")
+    print(f"Region names: {camera.region_names}")
+    print(f"Regions: {camera.regions}")
+    cv2.imshow("Region view", camera.capture_with_regions())
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()

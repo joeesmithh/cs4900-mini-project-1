@@ -90,10 +90,10 @@ The explicit `torch` line installs the smaller size CPU-only PyTorch build, whic
 python3 main.py
 ```
 
-| Mode              | Description                                                                         | Argument | Full Command           |
-| ----------------- | ----------------------------------------------------------------------------------- | -------- | ---------------------- |
-| Headless (no GUI) | Run the program with in default speech interaction mode                             | —        | `python main.py`       |
-| Live camera view  | Run the program with speech interaction + live camera and capture view side-by-side | `--gui`  | `python main.py --gui` |
+| Mode              | Description                                                                           | Argument    | Full Command               |
+| ----------------- | ------------------------------------------------------------------------------------- | ----------- | -------------------------- |
+| Headless (no GUI) | Run the program with in default speech interaction mode                               | —           | `python main.py`           |
+| Live camera view  | Run the program with speech interaction + live camera and capture view side-by-side   | `--gui`     | `python main.py --gui`     |
 | Select TTS voice  | Pick the pyttsx3 voice by index (see `--voices`); combines with any mode; default `0` | `--voice N` | `python main.py --voice 1` |
 
 The first launch pauses briefly to download (first run only) and load the Whisper `base` model. When prompted, speak the name of an object (e.g. "bottle", "cup", "laptop") and a target zone ("top left", "top right", "bottom left", "bottom right", or "center"). The app will guide you with spoken directions until the object is positioned correctly, then take the photo automatically. Captures are saved to `captures/`.
@@ -102,9 +102,10 @@ The first launch pauses briefly to download (first run only) and load the Whispe
 
 Test individual components in isolation:
 
-| Component             | Description                           | Argument   | Full Command              |
-| --------------------- | ------------------------------------- | ---------- | ------------------------- |
-| Text-to-speech        | Type text to hear it spoken           | `--tts`    | `python main.py --tts`    |
-| Text-to-speech voices | List and hear available TTS voices    | `--voices` | `python main.py --voices` |
-| Speech-to-text        | Speak in microphone to see transcript | `--stt`    | `python main.py --stt`    |
-| Object detection      | YOLO-annotated detection feed         | `--detect` | `python main.py --detect` |
+| Component             | Description                                         | Argument   | Full Command              |
+| --------------------- | --------------------------------------------------- | ---------- | ------------------------- |
+| Text-to-speech        | Type text to hear it spoken                         | `--tts`    | `python main.py --tts`    |
+| Text-to-speech voices | List and hear available TTS voices                  | `--voices` | `python main.py --voices` |
+| Speech-to-text        | Speak in microphone to see transcript               | `--stt`    | `python main.py --stt`    |
+| Object detection      | YOLO-annotated detection feed                       | `--detect` | `python main.py --detect` |
+| Camera capture        | View camera configuration and region bounding boxes | `--camera` | `python main.py --camera` |

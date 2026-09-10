@@ -1,5 +1,4 @@
 import argparse
-import camera
 import debug
 import cv2
 from detector import Detector
@@ -7,6 +6,7 @@ from speech_io import SpeechIO
 from argparse import Namespace  # Type hinting for argparse arguments
 from cv2.typing import MatLike  # Type hinting for cv2 images and matrices
 from enum import StrEnum
+from camera import Camera
 
 # Tuple: ("<flag>", "<help message>")
 ARGS = [
@@ -14,16 +14,8 @@ ARGS = [
     ("--stt", "Test STT: speak, see transcript printed"),
     ("--detect", "Test detection: live webcam with YOLO boxes side-by-side"),
     ("--gui", "Visualize the capture and detections side-by-side"),
-    ("--voices", "Listen to pyttsx3 voices")
-]
-
-# Screen regions
-REGIONS = [
-    "top left",
-    "top right",
-    "bottom left",
-    "bottom right",
-    "center"
+    ("--voices", "Listen to pyttsx3 voices"),
+    ("--camera", "View camera a regions in console")
 ]
 
 # Collection of TTS phrases
@@ -63,9 +55,14 @@ def main() -> None:
     if args.detect:
         debug.debug_detect(Detector())
         return
+    
+    if args.camera:
+        camera: Camera = Camera()
+        debug.debug_camera(camera)
+        return
 
-    sio: SpeechIO = SpeechIO(voice_index=args.voice)
     if args.tts or args.stt or args.voices:
+        sio: SpeechIO = SpeechIO(voice_index=args.voice)
         if args.tts:
             debug.debug_tts(sio)
         elif args.stt:
@@ -77,6 +74,9 @@ def main() -> None:
     # Main pipeline
     # -------------------------------------------------------------------------
 
+    camera: Camera = Camera()
+    sio: SpeechIO = SpeechIO(voice_index=args.voice)
+    
     # 1. Capture image
 
     # 2. Detect objects
@@ -94,10 +94,10 @@ def main() -> None:
 
     # 6. Ask object framing
     sio.speak(Phrases.PROMPT_CHOOSE_REGION +
-              result + ": " + ", ".join(REGIONS))
+              result + ": " + ", ".join(camera.region_names))
 
     # 7. Get user framing region choice
-    result = sio.make_choice(choices=REGIONS,
+    result = sio.make_choice(choices=camera.region_names,
                              invalid_response=Phrases.INVALID_RESPONSE)
     sio.speak(f"You chose: {result}")
 
