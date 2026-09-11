@@ -29,25 +29,17 @@ class Camera:
     def region_names(self) -> list[str]:
         return [region for region in self._regions]
 
-    def _get_regions(self, width: int, height: int) -> dict[str, list[tuple[int, int]]]:
+    def _get_regions(self, width: int, height: int) -> dict[str, tuple[int, int, int, int]]:
         frame_width      = width // 2
         frame_height     = height // 2
-        top_left         = (0, 0)
-        top_middle       = (frame_width, 0)
-        middle_left      = (0, frame_height)
-        middle_middle    = (frame_width, frame_height)
-        middle_right     = (width, frame_height)
-        bottom_middle    = (frame_width, height)
-        bottom_right     = (width, height)
         return {
-            "top left": [top_left, middle_middle],
-            "top right": [top_middle, middle_right],
-            "bottom left": [middle_left, bottom_middle],
-            "bottom right": [middle_middle, bottom_right],
-            "center": [(frame_width // 2,
-                        frame_height // 2),
-                       (frame_width // 2 + frame_width,
-                        frame_height // 2 + frame_height)]
+            "top left": (0, 0, frame_width, frame_height),
+            "top right": (frame_width, 0, width, frame_height),
+            "bottom left": (0, frame_height, frame_width, height),
+            "bottom right": (frame_width, frame_height, width, height),
+            "center": (frame_width // 2, frame_height // 2,
+                       frame_width // 2 + frame_width,
+                       frame_height // 2 + frame_height)
         }
     
     def _get_image(self, capture: cv2.VideoCapture) -> MatLike:
@@ -73,10 +65,10 @@ class Camera:
         frame = self.capture_image().copy()
         box_color = (0, 255, 0)       # BGR: green for the four quadrants
         center_color = (0, 255, 255)  # BGR: yellow for the overlapping center box
-        for name, (top_left, bottom_right) in self._regions.items():
+        for name, xyxy in self._regions.items():
             color = center_color if name == "center" else box_color
-            cv2.rectangle(frame, top_left, bottom_right, color, 2)
-            label_org = (top_left[0] + 5, top_left[1] + 22)
+            cv2.rectangle(frame, xyxy[:2], xyxy[2:], color, 2)
+            label_org = (xyxy[0] + 5, xyxy[1] + 20)
             cv2.putText(frame, name, label_org,
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2, cv2.LINE_AA)
         return frame
