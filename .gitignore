@@ -225,6 +225,7 @@ __marimo__/
 # Project
 .*/
 notebooks/
+captures/
 
 # Ignore all .md files except for README.md and anything under docs/
 *.md

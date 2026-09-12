@@ -63,3 +63,12 @@ class Camera:
 
         # Capture image
         return self._get_image(self._capture)
+
+    def read_frame(self) -> MatLike:
+        """Grab the next frame without discarding any for warm-up.
+
+        For a continuous loop that has already captured once and just needs
+        the latest frame -- unlike capture_image(), which re-warms up every
+        call.
+        """
+        return self._get_image(self._capture)
