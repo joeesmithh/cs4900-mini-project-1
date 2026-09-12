@@ -1,7 +1,6 @@
 import cv2
-import numpy as np
 import overlays
-from camera import CAMERA_INDEX
+from camera import Camera
 from detector import Detector
 from speech_io import SpeechIO
 from camera import Camera
@@ -35,25 +34,18 @@ def debug_detect(detector: Detector) -> None:
     """
     # Open the camera once and hold it for the whole loop (unlike
     # camera.capture_image(), which reopens it every call).
-    cap = cv2.VideoCapture(CAMERA_INDEX)
-    if not cap.isOpened():
-        raise RuntimeError(
-            f"Error: could not open camera at index {CAMERA_INDEX}!")
+    camera = Camera()
 
     print("Detection debug (press 'q' or Esc in the window to quit).")
     try:
         while True:
-            ok, frame = cap.read()
-            if not ok or frame is None:
-                break
-
+            frame = camera.read_frame()
             (result, detections) = detector.detect(frame)
             cv2.imshow("Detections  (press q to quit)", result.plot())
 
             if cv2.waitKey(1) & 0xFF in (ord("q"), 27):  # 27 = Esc
                 break
     finally:
-        cap.release()
         cv2.destroyAllWindows()
 
 def debug_camera(camera: Camera) -> None:

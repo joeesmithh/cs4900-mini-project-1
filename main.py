@@ -30,6 +30,13 @@ GUIDANCE_INTERVAL_SECONDS = 8.0
 # Directory captured photos are saved to.
 CAPTURES_DIR = Path("captures")
 
+# Seconds before an unchanged instruction is spoken again, so the user hears
+# reassurance without a wall of speech.
+REPEAT_SECONDS = 3.0
+
+# Where the framed photograph is written.
+OUTPUT_FILE = "capture.jpg"
+
 # Collection of TTS phrases
 
 
@@ -167,8 +174,6 @@ def main() -> None:
         return
     sio.speak(Phrases.LIST_OBJECTS + ", ".join(objects))
 
-    # 4. Ask object choice
-    sio.speak(Phrases.PROMPT_CHOOSE_OBJECT)
 
     # 5. Get user object choice
     target_label = sio.make_choice(choices=objects,
