@@ -81,7 +81,7 @@ given one step at a time instead of "left and up".
 | Object larger than the region       | "Move farther away from the object"         |
 | Overhang below `DEADZONE` (3%)      | Treated as framed; stops left/right chatter |
 | Object not detected this frame      | "I cannot see the &lt;object&gt;"           |
-| `MAX_READ_FAILURES` reads in a row  | Raises; the camera feed is dead             |
+| `MAX_READ_FAILURES` reads in a row  | `latest()` raises; the camera feed is dead  |
 
 The size guard is not optional. A quadrant is a quarter of the frame, so an
 object that fills half the view can never reach 90% coverage and the user
@@ -101,7 +101,7 @@ flowchart TD
     Fits -- No --> Back["Speak: move farther away"] --> Throttle
     Fits -- Yes --> Dir[Pick larger overhang axis] --> Speak[Instruction]
     Speak --> Throttle{Changed, or 3s elapsed?}
-    Throttle -- Yes --> Say[Speak and flush stale frames] --> Read
+    Throttle -- Yes --> Say[Speak] --> Read
     Throttle -- No --> Read
 ```
 
@@ -123,9 +123,22 @@ mean-absolute-difference test between consecutive grayscale frames.
 `SpeechIO.speak()` blocks until the phrase finishes, so speaking every frame
 would produce a wall of audio and freeze the loop. An instruction is spoken
 only when it **changes**, or every `REPEAT_SECONDS` (3s) to reassure a user who
-is still moving. After speaking, `FLUSH_FRAMES` frames are dropped with
-`cap.grab()`, since the camera keeps buffering during TTS and those stale
-frames no longer show where the camera is pointing.
+is still moving.
+
+### The camera thread
+
+[`preview.py`](../preview.py) owns the camera on a background thread for the
+whole run. The main thread blocks for seconds at a time on speech recognition,
+TTS, and YOLO; if it also read the camera, frames would pile up in the driver's
+buffer during those pauses and the first read afterward would return a stale
+one showing where the camera *used* to point. The thread reads continuously,
+so `Preview.latest()` is always the newest frame and nothing needs flushing.
+
+With `--gui`, the same thread draws the live video. OpenCV windows must be
+created and pumped from a single thread, and this one is never blocked, so the
+video stays smooth even while the app is listening for a voice command. The
+main thread never touches the window; it only hands over an `Overlay` (boxes,
+target region, current instruction) that the thread draws on each frame.
 
 ### Object selection
 
@@ -139,14 +152,14 @@ so the identity survives across frames.
 | File          | Change                                                                    |
 | ------------- | ------------------------------------------------------------------------- |
 | `framing.py`  | New. Region geometry, coverage metric, and direction logic.                |
+| `preview.py`  | New. Background camera thread; live `--gui` window with overlays.          |
 | `main.py`     | Steps 1–3 now use the real camera and detector instead of a placeholder list; added `guide_to_frame()` for steps 8–13. |
-| `camera.py`   | Split out `open_camera()` and `read_frame()` so one handle serves the still capture and the guidance loop. |
-| `debug.py`    | Added `show_framing()` for the `--gui` overlay; reuses `open_camera()`.    |
+| `camera.py`   | Split out `open_camera()` and `read_frame()`; `capture_image()` unchanged. |
+| `debug.py`    | `debug_detect()` reuses `open_camera()`.                                   |
 
 `camera.py` was split because the device streams to only one client at a time.
 The original `capture_image()` opened and released the camera per call, which
-would have fought with the long-lived handle the guidance loop needs.
-`capture_image()` is unchanged in behavior and still available.
+would have fought with the long-lived handle the preview thread holds.
 
 ## Running it
 
@@ -154,10 +167,10 @@ would have fought with the long-lived handle the guidance loop needs.
 # Full pipeline, voice only
 python main.py
 
-# Same, with a window showing the target region, the tracked box,
-# and the current instruction
+# Same, with live video: every detected object after the first capture,
+# then the target region, the tracked box, and the current instruction
 python main.py --gui
 ```
 
 In the `--gui` window, yellow is the region the user asked for and green is the
-tracked object. Press `q` or `Esc` to quit.
+detected object. Press `q` or `Esc` to quit.

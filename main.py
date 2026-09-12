@@ -5,6 +5,7 @@ import debug
 import cv2
 import framing
 from detector import Detector, parse_detections
+from preview import Preview, Overlay
 from speech_io import SpeechIO
 from argparse import Namespace  # Type hinting for argparse arguments
 from cv2.typing import MatLike  # Type hinting for cv2 images and matrices
@@ -15,7 +16,7 @@ ARGS = [
     ("--tts", "Test TTS: type text, hear it spoken"),
     ("--stt", "Test STT: speak, see transcript printed"),
     ("--detect", "Test detection: live webcam with YOLO boxes side-by-side"),
-    ("--gui", "Visualize the capture and detections side-by-side"),
+    ("--gui", "Show live video with detections and framing guidance"),
     ("--voices", "Listen to pyttsx3 voices")
 ]
 
@@ -31,13 +32,6 @@ REGIONS = [
 # Seconds before an unchanged instruction is spoken again, so the user hears
 # reassurance without a wall of speech.
 REPEAT_SECONDS = 3.0
-
-# Frames dropped after speaking, since the camera keeps buffering while TTS
-# blocks and the stale frames no longer show where the camera is pointing.
-FLUSH_FRAMES = 5
-
-# Consecutive failed camera reads tolerated before giving up on the feed.
-MAX_READ_FAILURES = 30
 
 # Where the framed photograph is written.
 OUTPUT_FILE = "capture.jpg"
@@ -72,31 +66,22 @@ def get_args() -> Namespace:
     return parser.parse_args()
 
 
-def guide_to_frame(cap: cv2.VideoCapture,
+def guide_to_frame(preview: Preview,
                    detector: Detector,
                    sio: SpeechIO,
                    label: str,
-                   region_name: str,
-                   show_gui: bool = False) -> MatLike | None:
+                   region_name: str) -> MatLike | None:
     """Speak movement instructions until `label` sits inside `region_name`.
 
     Runs detection continuously rather than capturing, moving, and recapturing:
     the user hears a correction the moment the camera drifts. Returns the frame
-    the object was framed in, or None if the user quit the GUI window.
+    the object was framed in, or None if the user quit the preview window.
     """
     last_said: str | None = None
     last_time = 0.0
-    failures = 0
 
-    while True:
-        ok, frame = cap.read()
-        if not ok or frame is None:
-            # A dropped frame is normal; a dead feed is not.
-            failures += 1
-            if failures > MAX_READ_FAILURES:
-                raise RuntimeError("Lost the camera feed while guiding")
-            continue
-        failures = 0
+    while not preview.quit_requested.is_set():
+        frame = preview.latest()
 
         # Read the size from the frame itself: the webcam may not have given
         # us the resolution we asked for.
@@ -115,10 +100,10 @@ def guide_to_frame(cap: cv2.VideoCapture,
         else:
             instruction = framing.guidance(box, region, width, height)
 
-        if show_gui:
-            debug.show_framing(frame, region, box, instruction)
-            if cv2.waitKey(1) & 0xFF in (ord("q"), 27):  # 27 = Esc
-                return None
+        preview.set_overlay(Overlay(
+            boxes=[(box, label)] if box is not None else [],
+            region=region,
+            text=instruction or "Framed"))
 
         if instruction is None:
             return frame
@@ -128,8 +113,8 @@ def guide_to_frame(cap: cv2.VideoCapture,
         if instruction != last_said or now - last_time > REPEAT_SECONDS:
             sio.speak(instruction)
             last_said, last_time = instruction, now
-            for _ in range(FLUSH_FRAMES):
-                cap.grab()
+
+    return None
 
 
 def main() -> None:
@@ -159,15 +144,19 @@ def main() -> None:
 
     detector: Detector = Detector()
 
-    # One handle for the whole run: the initial still and the guidance loop
-    # share it, because the device only streams to one client at a time.
+    # The preview thread owns the camera for the whole run and, with --gui,
+    # keeps live video on screen while this thread blocks on speech.
     cap = camera.open_camera()
+    preview = Preview(cap, show=args.gui)
+    preview.start()
     try:
         # 1. Capture image
-        frame = camera.read_frame(cap, warmup=camera.WARMUP_FRAMES)
+        frame = preview.latest()
 
         # 2. Detect objects
         detections = parse_detections(detector.detect(frame))
+        preview.set_overlay(Overlay(
+            boxes=[(box, label) for label, box, _ in detections]))
 
         # 3. List detected objects, deduplicated but kept in detection order
         objects = list(dict.fromkeys(label for label, _, _ in detections))
@@ -195,9 +184,9 @@ def main() -> None:
         # 8-12. Guide the user until the object sits in the chosen region.
         # Steps 8 through 12 all live inside this loop: it measures coverage,
         # picks a direction, speaks it, and re-detects on the next frame.
-        framed = guide_to_frame(cap, detector, sio,
-                                chosen_object, chosen_region, args.gui)
-        if framed is None:  # User quit the GUI window
+        framed = guide_to_frame(preview, detector, sio,
+                                chosen_object, chosen_region)
+        if framed is None:  # User quit the preview window
             return
 
         # 13. Capture image (the frame the object was framed in)
@@ -206,8 +195,8 @@ def main() -> None:
         sio.speak(Phrases.SAVED)
         print(f"Saved {OUTPUT_FILE}")
     finally:
+        preview.stop()
         cap.release()
-        cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
