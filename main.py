@@ -102,12 +102,9 @@ def guide_to_capture(camera: Camera,
         else:
             instruction = framing.guidance(match[1], frame_region, *camera.resolution)
 
-        annotated = overlays.overlay_regions(frame.copy(), camera.regions, region_name)
-        if match is not None:
-            cv2.rectangle(annotated, match[1][:2], match[1][2:], (0, 0, 255), 2)
-        cv2.putText(annotated, instruction or "Hold still", (10, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2, cv2.LINE_AA)
-        cv2.imshow("Detections", annotated)
+        detection_region = match[1] if match is not None else None
+        overlays.show_detection_overlay(frame.copy(), camera.regions, region_name,
+                                        detection_region, target_label)
 
         if instruction is None:
             return frame

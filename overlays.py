@@ -31,26 +31,29 @@ def overlay_regions(frame: MatLike,
 def show_detection_overlay(frame: MatLike,
                            regions: dict[str, Region],
                            region_name: str,
-                           detection_region: Region,
+                           detection_region: Region | None,
                            label: str) -> None:
-    """Display frame with region grid, shaded overlap, and object bbox.
+    """Show frame with region grid, shaded overlap, detection bbox, and label.
 
-    Blocks until a key is pressed, then closes the window.
+    Draws into the "Detections" window and returns immediately -- the caller
+    owns the event loop (cv2.waitKey / cv2.destroyAllWindows), so this can be
+    called once per frame inside a live guidance loop. If detection_region is
+    None (target not currently detected), only the region grid and label are
+    drawn.
     """
     overlay = overlay_regions(frame, regions, region_name)
     color = (0, 0, 255)
 
-    frame_region = regions[region_name]
-    overlap_rect = intersection(detection_region, frame_region)
-    if overlap_rect is not None:
-        shaded = overlay.copy()
-        cv2.rectangle(shaded, overlap_rect[:2], overlap_rect[2:], color, cv2.FILLED)
-        # Blend rather than draw directly so the region grid and image stay visible.
-        cv2.addWeighted(shaded, 0.4, overlay, 0.6, 0, dst=overlay)
+    if detection_region is not None:
+        frame_region = regions[region_name]
+        overlap_rect = intersection(detection_region, frame_region)
+        if overlap_rect is not None:
+            shaded = overlay.copy()
+            cv2.rectangle(shaded, overlap_rect[:2], overlap_rect[2:], color, cv2.FILLED)
+            # Blend rather than draw directly so the region grid and image stay visible.
+            cv2.addWeighted(shaded, 0.4, overlay, 0.6, 0, dst=overlay)
+        cv2.rectangle(overlay, detection_region[:2], detection_region[2:], color, 2)
+        cv2.putText(overlay, label, (detection_region[0], detection_region[1] - 5),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2, cv2.LINE_AA)
 
-    cv2.rectangle(overlay, detection_region[:2], detection_region[2:], color, 2)
-    cv2.putText(overlay, label, (detection_region[0], detection_region[1] - 5),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2, cv2.LINE_AA)
     cv2.imshow("Detections", overlay)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
