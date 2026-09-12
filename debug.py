@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import overlays
 from camera import CAMERA_INDEX
 from detector import Detector
 from speech_io import SpeechIO
@@ -29,7 +30,7 @@ def debug_stt(sio: SpeechIO) -> None:
 
 
 def debug_detect(detector: Detector) -> None:
-    """Live webcam loop: showsYOLO's annotated frame, refreshed as
+    """Live webcam loop: shows YOLO's annotated frame, refreshed as
     fast as the CPU can run it. Press 'q' or Esc in the window to quit.
     """
     # Open the camera once and hold it for the whole loop (unlike
@@ -46,10 +47,8 @@ def debug_detect(detector: Detector) -> None:
             if not ok or frame is None:
                 break
 
-            result = detector.detect(frame)
-            annotated = result.plot()  # BGR frame with boxes + labels drawn
-
-            cv2.imshow("Detections  (press q to quit)", annotated)
+            (result, detections) = detector.detect(frame)
+            cv2.imshow("Detections  (press q to quit)", result.plot())
 
             if cv2.waitKey(1) & 0xFF in (ord("q"), 27):  # 27 = Esc
                 break
@@ -57,10 +56,12 @@ def debug_detect(detector: Detector) -> None:
         cap.release()
         cv2.destroyAllWindows()
 
-def debug_camera(camera: Camera):
+def debug_camera(camera: Camera) -> None:
+    """Print camera resolution/regions and show the region grid over a frame."""
     print(f"Camera resolution: {camera.resolution}")
     print(f"Region names: {camera.region_names}")
     print(f"Regions: {camera.regions}")
-    cv2.imshow("Region view", camera.capture_with_regions())
+    capture = camera.capture_image().copy()
+    cv2.imshow("Region view", overlays.overlay_regions(capture, camera.regions))
     cv2.waitKey(0)
     cv2.destroyAllWindows()

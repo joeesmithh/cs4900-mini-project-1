@@ -16,7 +16,7 @@ A speech-controlled desktop application that guides visually impaired users to p
 - Working microphone and speakers
 - `ffmpeg` available on the system `PATH` (used by OpenAI Whisper)
 - Internet connection for the first run only (downloads the Whisper `base` model,
-  ~140 MB, and the YOLOv8 model). Speech recognition then runs fully offline.
+  ~140 MB, and the YOLO26 model). Speech recognition then runs fully offline.
 
 ## System dependencies (ffmpeg)
 
@@ -90,11 +90,12 @@ The explicit `torch` line installs the smaller size CPU-only PyTorch build, whic
 python3 main.py
 ```
 
-| Mode              | Description                                                                           | Argument    | Full Command               |
-| ----------------- | ------------------------------------------------------------------------------------- | ----------- | -------------------------- |
-| Headless (no GUI) | Run the program with in default speech interaction mode                               | —           | `python main.py`           |
-| Live camera view  | Run the program with speech interaction + live camera and capture view side-by-side   | `--gui`     | `python main.py --gui`     |
-| Select TTS voice  | Pick the pyttsx3 voice by index (see `--voices`); combines with any mode; default `0` | `--voice N` | `python main.py --voice 1` |
+| Mode              | Description                                                                           | Argument    | Full Command                |
+| ----------------- | ------------------------------------------------------------------------------------- | ----------- | --------------------------- |
+| Headless (no GUI) | Run the program with in default speech interaction mode                               | —           | `python main.py`            |
+| Live camera view  | Run the program with speech interaction + live camera and capture view side-by-side   | `--gui`     | `python main.py --gui`      |
+| Select TTS voice  | Pick the pyttsx3 voice by index (see `--voices`); combines with any mode; default `0` | `--voice N` | `python main.py --voice 1`  |
+| Set TTS rate      | Set the rate at which TTS reads phrases; default: `150`                               | `--rate N`  | `python main.py --rate 300` |
 
 The first launch pauses briefly to download (first run only) and load the Whisper `base` model. When prompted, speak the name of an object (e.g. "bottle", "cup", "laptop") and a target zone ("top left", "top right", "bottom left", "bottom right", or "center"). The app will guide you with spoken directions until the object is positioned correctly, then take the photo automatically. Captures are saved to `captures/`.
 
