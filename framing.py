@@ -1,86 +1,84 @@
-# Fraction of the object's area that must sit inside the target region before
-# the photograph is taken.
-COVERAGE_TARGET = 0.90
+Region = tuple[int, int, int, int]
 
-# Overhang smaller than this fraction of the frame is ignored, so the app stops
-# nudging once the object is close enough instead of oscillating on jitter.
+# Fraction of the object's area that must sit inside the target region
+# before the photograph is taken.
+CAPTURE_THRESHOLD = 0.90
+
+# Overhang smaller than this fraction of the frame is ignored, so guidance
+# stops nudging once the object is close enough instead of oscillating on
+# camera jitter.
 DEADZONE = 0.03
 
-# Size of the center region as a fraction of the frame.
-CENTER_SCALE = 1 / 3
 
-# Pixel box (x1, y1, x2, y2), the same convention ultralytics uses.
-Bbox = tuple[int, int, int, int]
+def intersection(bbox: Region, region: Region) -> Region | None:
+    """Return the overlapping rectangle between bbox and region.
 
-
-def region_bbox(region: str, width: int, height: int) -> Bbox:
-    """Pixel box of a named region within a width x height frame.
-
-    The four quadrants tile the frame; the center is a smaller box straddling
-    all four, so "center" is a distinct target rather than a corner.
+    bbox and region are both (x1, y1, x2, y2) pixel coordinates. Returns
+    None if the two rectangles do not overlap.
     """
-    mid_x, mid_y = width // 2, height // 2
-    match region:
-        case "top left":
-            return (0, 0, mid_x, mid_y)
-        case "top right":
-            return (mid_x, 0, width, mid_y)
-        case "bottom left":
-            return (0, mid_y, mid_x, height)
-        case "bottom right":
-            return (mid_x, mid_y, width, height)
-        case "center":
-            half_w = int(width * CENTER_SCALE / 2)
-            half_h = int(height * CENTER_SCALE / 2)
-            return (mid_x - half_w, mid_y - half_h,
-                    mid_x + half_w, mid_y + half_h)
-    raise ValueError(f"Unknown region: {region}")
+    ix1 = max(bbox[0], region[0])
+    iy1 = max(bbox[1], region[1])
+    ix2 = min(bbox[2], region[2])
+    iy2 = min(bbox[3], region[3])
+    if ix2 <= ix1 or iy2 <= iy1:
+        return None
+    return (ix1, iy1, ix2, iy2)
 
 
-def coverage(box: Bbox, region: Bbox) -> float:
-    """Fraction of the object's area that lies inside the region.
+def overlap_ratio(bbox: Region, region: Region) -> float:
+    """Return the fraction of bbox's area that falls inside region.
 
-    This is intersection over the *object's* area, not IoU: the assignment
-    asks what percentage of the object sits in the chosen location, so the
-    region's size must not dilute the score.
+    bbox and region are both (x1, y1, x2, y2) pixel coordinates. Returns
+    0.0 if the two rectangles do not overlap.
     """
-    bx1, by1, bx2, by2 = box
-    rx1, ry1, rx2, ry2 = region
-    overlap_w = max(0, min(bx2, rx2) - max(bx1, rx1))
-    overlap_h = max(0, min(by2, ry2) - max(by1, ry1))
-    area = (bx2 - bx1) * (by2 - by1)
-    return (overlap_w * overlap_h) / area if area else 0.0
+    overlap_rect = intersection(bbox, region)
+    if overlap_rect is None:
+        return 0.0
+    ix1, iy1, ix2, iy2 = overlap_rect
+    intersection_area = (ix2 - ix1) * (iy2 - iy1)
+    bbox_area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
+    return intersection_area / bbox_area
 
 
-def guidance(box: Bbox, region: Bbox, width: int, height: int) -> str | None:
-    """Spoken instruction that moves the object toward the region.
+def guidance(bbox: Region, region: Region,
+            frame_width: int, frame_height: int) -> str | None:
+    """Spoken instruction that moves bbox toward region, or None once framed.
 
-    Returns None once the object is framed well enough to photograph.
+    bbox and region are (x1, y1, x2, y2) pixel coordinates; frame_width and
+    frame_height are the full frame size, so the deadzone scales with
+    resolution. Returns None once overlap_ratio(bbox, region) reaches
+    CAPTURE_THRESHOLD -- the caller should then say "Hold still" and capture.
     """
-    if coverage(box, region) >= COVERAGE_TARGET:
+    if overlap_ratio(bbox, region) >= CAPTURE_THRESHOLD:
         return None
 
-    bx1, by1, bx2, by2 = box
+    bx1, by1, bx2, by2 = bbox
     rx1, ry1, rx2, ry2 = region
 
-    # The object is bigger than the region, so no amount of aiming will fit it
-    # and the caller would otherwise be nudged back and forth forever.
+    # The object is bigger than the region: no amount of aiming fits it, and
+    # without this check the caller would be nudged back and forth forever.
     if (bx2 - bx1) > (rx2 - rx1) or (by2 - by1) > (ry2 - ry1):
-        return "Move farther away from the object"
+        return "Move camera further away from object"
 
-    # Pixels the object must travel to sit fully inside the region. Positive
-    # means right/down. Measuring the overhang rather than the distance between
-    # centers means both terms cancel to zero exactly when the object is
-    # inside, which is the same moment coverage reaches 100%.
+    # Pixels the box pokes outside region on each axis. Positive dx means the
+    # box overhangs on the left and must move right; positive dy means it
+    # overhangs on top and must move down. Measuring overhang rather than the
+    # distance between centers means both terms reach zero exactly when the
+    # box is fully inside the region.
     dx = max(0, rx1 - bx1) - max(0, bx2 - rx2)
     dy = max(0, ry1 - by1) - max(0, by2 - ry2)
 
-    if abs(dx) / width < DEADZONE and abs(dy) / height < DEADZONE:
+    horizontal = abs(dx) / frame_width >= DEADZONE
+    vertical = abs(dy) / frame_height >= DEADZONE
+
+    if not horizontal and not vertical:
         return None
 
-    # Correct the larger error first so the user is given one step at a time.
-    # Panning the camera left pushes the object right in the frame, so the
-    # camera always turns opposite to the object's required travel.
-    if abs(dx) / width >= abs(dy) / height:
-        return "Turn the camera left" if dx > 0 else "Turn the camera right"
-    return "Tilt the camera up" if dy > 0 else "Tilt the camera down"
+    vertical_word = "up" if dy > 0 else "down"
+    horizontal_word = "left" if dx > 0 else "right"
+
+    if horizontal and vertical:
+        return f"Move {vertical_word} and to the {horizontal_word}"
+    if vertical:
+        return f"Move {vertical_word}"
+    return f"Move {horizontal_word}"

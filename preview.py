@@ -3,7 +3,7 @@ import cv2
 from camera import WARMUP_FRAMES
 from cv2.typing import MatLike  # Type hinting for cv2 images and matrices
 from dataclasses import dataclass, field
-from framing import Bbox
+from framing import Region
 
 # Overlay colors in BGR.
 REGION_COLOR = (0, 255, 255)  # Yellow: the region the user asked for
@@ -21,8 +21,8 @@ FIRST_FRAME_TIMEOUT = 10.0
 @dataclass
 class Overlay:
     """What to draw on top of the live video."""
-    boxes: list[tuple[Bbox, str]] = field(default_factory=list)  # (box, label)
-    region: Bbox | None = None
+    boxes: list[tuple[Region, str]] = field(default_factory=list)  # (box, label)
+    region: Region | None = None
     text: str | None = None
 
 

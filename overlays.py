@@ -1,6 +1,6 @@
 import cv2
 from cv2.typing import MatLike  # Type hinting for cv2 images and matrices
-from geometry import Region, intersection
+from framing import Region, intersection
 
 
 def overlay_regions(frame: MatLike,

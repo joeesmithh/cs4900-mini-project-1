@@ -3,7 +3,7 @@ import time
 import debug
 import cv2
 import overlays
-import geometry
+import framing
 from datetime import datetime
 from pathlib import Path
 from detector import Detector, Detection
@@ -25,7 +25,7 @@ ARGS = [
 
 # Seconds before an unchanged guidance instruction is spoken again, so the
 # user hears reassurance without a wall of speech.
-GUIDANCE_INTERVAL_SECONDS = 8.0
+GUIDANCE_INTERVAL_SECONDS = 6.0
 
 # Directory captured photos are saved to.
 CAPTURES_DIR = Path("captures")
@@ -36,6 +36,10 @@ REPEAT_SECONDS = 3.0
 
 # Where the framed photograph is written.
 OUTPUT_FILE = "capture.jpg"
+
+# Seconds to wait after saying "Hold still" before snapping the photo, so any
+# motion from the camera or the object has settled and the shot isn't blurry.
+HOLD_STILL_DELAY_SECONDS = 2.0
 
 # Collection of TTS phrases
 
@@ -48,7 +52,7 @@ class Phrases(StrEnum):
     REPORT_OBJECT_AREA = "The object currently fills "
     NO_OBJECTS = "I could not detect any objects. Please try again."
     OBJECT_LOST = "I cannot see the "
-    HOLD_STILL = "Hold still."
+    HOLD_STILL = "Good. Capturing image. Hold still."
     SAVED = "Picture saved."
 
 
@@ -96,7 +100,7 @@ def guide_to_capture(camera: Camera,
         if match is None:
             instruction = Phrases.OBJECT_LOST + target_label
         else:
-            instruction = geometry.guidance(match[1], frame_region, *camera.resolution)
+            instruction = framing.guidance(match[1], frame_region, *camera.resolution)
 
         annotated = overlays.overlay_regions(frame.copy(), camera.regions, region_name)
         if match is not None:
@@ -173,6 +177,7 @@ def main() -> None:
         sio.speak(Phrases.NO_OBJECTS)
         return
     sio.speak(Phrases.LIST_OBJECTS + ", ".join(objects))
+    sio.speak(Phrases.PROMPT_CHOOSE_OBJECT)
 
 
     # 5. Get user object choice
@@ -192,10 +197,11 @@ def main() -> None:
     frame_region = camera.regions[region_name]
     detection_region = next((d[1] for d in detections if d[0] == target_label), None)
     if detection_region is not None:
-        area_percent = geometry.overlap_ratio(detection_region, frame_region) * 100
+        area_percent = framing.overlap_ratio(detection_region, frame_region) * 100
         sio.speak(f"{Phrases.REPORT_OBJECT_AREA}{area_percent:.0f}"
                   f" percent of the {region_name} region.")
 
+    # TODO: ensure that if chosen object bounding box is contained within the overall image but envelops the framing region that that is still considered a successful framing
     # 9-15. Guide the user until the object sits in the chosen region, then
     # capture. Steps 9 through 15 all live inside this loop: it measures
     # coverage, speaks a direction, and re-detects on the next frame.
@@ -205,6 +211,8 @@ def main() -> None:
         return
 
     sio.speak(Phrases.HOLD_STILL)
+    time.sleep(HOLD_STILL_DELAY_SECONDS)
+    framed = camera.capture_image()  # re-capture after the pause, not the stale frame
     CAPTURES_DIR.mkdir(exist_ok=True)
     filename = CAPTURES_DIR / f"capture_{datetime.now():%Y%m%d_%H%M%S}.jpg"
     cv2.imwrite(str(filename), framed)
