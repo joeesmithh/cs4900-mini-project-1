@@ -25,7 +25,7 @@ ARGS = [
 
 # Seconds before an unchanged guidance instruction is spoken again, so the
 # user hears reassurance without a wall of speech.
-GUIDANCE_INTERVAL_SECONDS = 6.0
+GUIDANCE_INTERVAL_SECONDS = 3.0
 
 # Directory captured photos are saved to.
 CAPTURES_DIR = Path("captures")
@@ -47,7 +47,7 @@ HOLD_STILL_DELAY_SECONDS = 2.0
 class Phrases(StrEnum):
     LIST_OBJECTS = "The detected objects were "
     PROMPT_CHOOSE_OBJECT = "Which object would you like to frame?"
-    PROMPT_RETRY_OBJECT = "Or say 'try again' to take a new photo."
+    PROMPT_RETRY_OBJECT = "Say 'try again' to retry."
     INVALID_RESPONSE = "Invalid response. Try again."
     PROMPT_CHOOSE_REGION = "Choose a region in which to frame the "
     REPORT_OBJECT_AREA = "The object currently fills "
@@ -153,8 +153,7 @@ def choose_object_or_retry(camera: Camera,
             continue
 
         sio.speak(Phrases.LIST_OBJECTS + ", ".join(objects))
-        sio.speak(Phrases.PROMPT_CHOOSE_OBJECT)
-        sio.speak(Phrases.PROMPT_RETRY_OBJECT)
+        sio.speak(Phrases.PROMPT_CHOOSE_OBJECT + Phrases.PROMPT_RETRY_OBJECT)
 
         response = sio.listen()
         while response is None or not (
