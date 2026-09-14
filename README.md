@@ -97,6 +97,7 @@ python3 main.py
 | Live camera view  | Run the program with speech interaction + live camera and capture view side-by-side   | `--gui`     | `python main.py --gui`      |
 | Select TTS voice  | Pick the pyttsx3 voice by index (see `--voices`); combines with any mode; default `0` | `--voice N` | `python main.py --voice 1`  |
 | Set TTS rate      | Set the rate at which TTS reads phrases; default: `150`                               | `--rate N`  | `python main.py --rate 300` |
+| Framing method    | Choose how the object is judged "framed": `bbox` (contained in the region) or `distance` (centered in the region); default: `distance` | `--method {bbox,distance}` | `python main.py --method bbox` |
 
 The first launch pauses briefly to download (first run only) and load the Whisper `base` model. When prompted, speak the name of an object (e.g. "bottle", "cup", "laptop") and a target zone ("top left", "top right", "bottom left", "bottom right", or "center"). The app will guide you with spoken directions until the object is positioned correctly, then take the photo automatically. Captures are saved to `captures/`.
 

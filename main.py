@@ -47,7 +47,7 @@ HOLD_STILL_DELAY_SECONDS = 2.0
 class Phrases(StrEnum):
     LIST_OBJECTS = "The detected objects were "
     PROMPT_CHOOSE_OBJECT = "Which object would you like to frame?"
-    PROMPT_RETRY_OBJECT = "Or say retry to take a new photo."
+    PROMPT_RETRY_OBJECT = "Or say 'try again' to take a new photo."
     INVALID_RESPONSE = "Invalid response. Try again."
     PROMPT_CHOOSE_REGION = "Choose a region in which to frame the "
     REPORT_OBJECT_AREA = "The object currently fills "
@@ -55,7 +55,7 @@ class Phrases(StrEnum):
     OBJECT_LOST = "I cannot see the "
     HOLD_STILL = "Good. Capturing image. Hold still."
     SAVED = "Picture saved."
-    PROMPT_RETRY_OR_DONE = "Say retry to take another photo, or say done to finish."
+    PROMPT_RETRY_OR_DONE = "Say 'try again' to take another photo or say 'done' to finish."
 
 
 def get_args() -> Namespace:
@@ -75,6 +75,11 @@ def get_args() -> Namespace:
                         type=int,
                         default=200,
                         help="pyttsx3 voice speaking rate")
+    parser.add_argument("--method",
+                        choices=["bbox", "distance"],
+                        default="distance",
+                        help="Framing method: bbox (object contained in region) or "
+                             "distance (object centered in region)")
     return parser.parse_args()
 
 
@@ -84,13 +89,15 @@ def guide_to_capture(camera: Camera,
                      target_label: str,
                      region_name: str,
                      frame: MatLike,
-                     detections: list[Detection]) -> MatLike | None:
+                     detections: list[Detection],
+                     method: str) -> MatLike | None:
     """Speak movement instructions until `target_label` sits inside `region_name`.
 
-    Runs detection on a fresh frame each iteration rather than capturing,
+    Runs detection on a new frame each iteration rather than capturing,
     waiting, and recapturing, so a correction is spoken the moment the camera
-    drifts. `frame`/`detections` are the first frame and its detections,
-    already captured by the caller. Returns the frame the object was framed
+    drifts. `frame` and `detections` are the frame and its detections,
+    already captured by the caller. `method` selects the framing.guidance()
+    method ("bbox" or "distance"). Returns the frame the object was framed
     in, or None if the user quit the preview window (pressed q or Esc).
     """
     frame_region = camera.regions[region_name]
@@ -102,7 +109,8 @@ def guide_to_capture(camera: Camera,
         if match is None:
             instruction = Phrases.OBJECT_LOST + target_label
         else:
-            instruction = framing.guidance(match[1], frame_region, *camera.resolution)
+            instruction = framing.guidance(match[1], frame_region, *camera.resolution,
+                                           method=method)
 
         detection_region = match[1] if match is not None else None
         overlays.show_detection_overlay(frame.copy(), camera.regions, region_name,
@@ -130,7 +138,7 @@ def choose_object_or_retry(camera: Camera,
     """Capture a photo, detect objects, and let the user choose one.
 
     Recaptures immediately if nothing is detected, and recaptures if the user
-    says "retry" instead of naming a detected object. Returns the capture
+    says "try again" instead of naming a detected object. Returns the capture
     frame, its detections, and the chosen target label.
     """
     while True:
@@ -150,20 +158,22 @@ def choose_object_or_retry(camera: Camera,
 
         response = sio.listen()
         while response is None or not (
-                "retry" in response or any(obj in response for obj in objects)):
+                "try again" in response or any(obj in response for obj in objects)):
             sio.speak(Phrases.INVALID_RESPONSE)
             response = sio.listen()
 
-        if "retry" in response:
+        if "try again" in response:
             continue
 
         return capture, detections, next(obj for obj in objects if obj in response)
 
 
-def run_capture_session(camera: Camera, detector: Detector, sio: SpeechIO) -> bool:
+def run_capture_session(camera: Camera, detector: Detector, sio: SpeechIO,
+                        method: str) -> bool:
     """Run one capture session end to end: choose object, choose region,
     guide into position, and save.
 
+    `method` selects the framing.guidance() method ("bbox" or "distance").
     Returns True if the user asked to retry with a new photo afterward,
     False if the session ended (quit the preview window, or declined retry).
     """
@@ -184,7 +194,7 @@ def run_capture_session(camera: Camera, detector: Detector, sio: SpeechIO) -> bo
 
     # TODO: ensure that if chosen object bounding box is contained within the overall image but envelops the framing region that that is still considered a successful framing
     framed = guide_to_capture(camera, detector, sio, target_label,
-                              region_name, capture, detections)
+                              region_name, capture, detections, method)
     if framed is None:  # User quit the preview window
         return False
 
@@ -199,7 +209,7 @@ def run_capture_session(camera: Camera, detector: Detector, sio: SpeechIO) -> bo
 
     sio.speak(Phrases.PROMPT_RETRY_OR_DONE)
     response = sio.listen()
-    return response is not None and "retry" in response
+    return response is not None and "try again" in response
 
 
 def main() -> None:
@@ -240,7 +250,7 @@ def main() -> None:
 
     # Choose object + region, guide into position, and save. Loops again if
     # the user says "retry" once a photo has been saved.
-    while run_capture_session(camera, detector, sio):
+    while run_capture_session(camera, detector, sio, args.method):
         pass
 
 
