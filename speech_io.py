@@ -18,7 +18,7 @@ def _strip_symbols(text: str) -> str:
 
 class SpeechIO:
     def __init__(self,
-                 rate: int = 150,
+                 rate: int = 200,
                  volume: float = 1.0,
                  voice_index: int = 0,
                  mic_index: int | None = None,

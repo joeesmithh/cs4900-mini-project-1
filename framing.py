@@ -2,7 +2,7 @@ Region = tuple[int, int, int, int]
 
 # Fraction of the object's area that must sit inside the target region
 # before the photograph is taken.
-CAPTURE_THRESHOLD = 0.90
+CAPTURE_THRESHOLD = 0.95
 
 # Overhang smaller than this fraction of the frame is ignored, so guidance
 # stops nudging once the object is close enough instead of oscillating on

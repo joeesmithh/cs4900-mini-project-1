@@ -38,15 +38,15 @@ class Camera:
     def _get_regions(self, width: int, height: int) -> dict[str, Region]:
         frame_width      = width // 2
         frame_height     = height // 2
-        third_width    = width // 3
-        third_height   = height // 3
+        quarter_width    = width // 3
+        quarter_height   = height // 3
         return {
             "top left": (0, 0, frame_width, frame_height),
             "top right": (frame_width, 0, width, frame_height),
             "bottom left": (0, frame_height, frame_width, height),
             "bottom right": (frame_width, frame_height, width, height),
-            "center": (third_width, third_height,
-                       width - third_width, height - third_height)
+            "center": (quarter_width, quarter_height,
+                       width - quarter_width, height - quarter_height)
         }
 
     def _get_image(self, capture: cv2.VideoCapture) -> MatLike:

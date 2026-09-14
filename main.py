@@ -47,6 +47,7 @@ HOLD_STILL_DELAY_SECONDS = 2.0
 class Phrases(StrEnum):
     LIST_OBJECTS = "The detected objects were "
     PROMPT_CHOOSE_OBJECT = "Which object would you like to frame?"
+    PROMPT_RETRY_OBJECT = "Or say retry to take a new photo."
     INVALID_RESPONSE = "Invalid response. Try again."
     PROMPT_CHOOSE_REGION = "Choose a region in which to frame the "
     REPORT_OBJECT_AREA = "The object currently fills "
@@ -54,6 +55,7 @@ class Phrases(StrEnum):
     OBJECT_LOST = "I cannot see the "
     HOLD_STILL = "Good. Capturing image. Hold still."
     SAVED = "Picture saved."
+    PROMPT_RETRY_OR_DONE = "Say retry to take another photo, or say done to finish."
 
 
 def get_args() -> Namespace:
@@ -71,7 +73,7 @@ def get_args() -> Namespace:
                         help="pyttsx3 voice index for TTS output (see --voices)")
     parser.add_argument("--rate",
                         type=int,
-                        default=150,
+                        default=200,
                         help="pyttsx3 voice speaking rate")
     return parser.parse_args()
 
@@ -122,6 +124,84 @@ def guide_to_capture(camera: Camera,
         _, detections = detector.detect(frame)
 
 
+def choose_object_or_retry(camera: Camera,
+                           detector: Detector,
+                           sio: SpeechIO) -> tuple[MatLike, list[Detection], str]:
+    """Capture a photo, detect objects, and let the user choose one.
+
+    Recaptures immediately if nothing is detected, and recaptures if the user
+    says "retry" instead of naming a detected object. Returns the capture
+    frame, its detections, and the chosen target label.
+    """
+    while True:
+        capture = camera.capture_image()
+        result, detections = detector.detect(capture)
+        cv2.imshow("Detections", overlays.overlay_regions(result.plot(), camera.regions))
+        cv2.waitKey(1)
+
+        objects = list(dict.fromkeys(label for label, _, _ in detections))
+        if not objects:
+            sio.speak(Phrases.NO_OBJECTS)
+            continue
+
+        sio.speak(Phrases.LIST_OBJECTS + ", ".join(objects))
+        sio.speak(Phrases.PROMPT_CHOOSE_OBJECT)
+        sio.speak(Phrases.PROMPT_RETRY_OBJECT)
+
+        response = sio.listen()
+        while response is None or not (
+                "retry" in response or any(obj in response for obj in objects)):
+            sio.speak(Phrases.INVALID_RESPONSE)
+            response = sio.listen()
+
+        if "retry" in response:
+            continue
+
+        return capture, detections, next(obj for obj in objects if obj in response)
+
+
+def run_capture_session(camera: Camera, detector: Detector, sio: SpeechIO) -> bool:
+    """Run one capture session end to end: choose object, choose region,
+    guide into position, and save.
+
+    Returns True if the user asked to retry with a new photo afterward,
+    False if the session ended (quit the preview window, or declined retry).
+    """
+    capture, detections, target_label = choose_object_or_retry(camera, detector, sio)
+
+    sio.speak(Phrases.PROMPT_CHOOSE_REGION +
+              target_label + ": " + ", ".join(camera.region_names))
+    region_name = sio.make_choice(choices=camera.region_names,
+                                  invalid_response=Phrases.INVALID_RESPONSE)
+    sio.speak(f"You chose: {region_name}")
+
+    frame_region = camera.regions[region_name]
+    detection_region = next((d[1] for d in detections if d[0] == target_label), None)
+    if detection_region is not None:
+        area_percent = framing.overlap_ratio(detection_region, frame_region) * 100
+        sio.speak(f"{Phrases.REPORT_OBJECT_AREA}{area_percent:.0f}"
+                  f" percent of the {region_name} region.")
+
+    # TODO: ensure that if chosen object bounding box is contained within the overall image but envelops the framing region that that is still considered a successful framing
+    framed = guide_to_capture(camera, detector, sio, target_label,
+                              region_name, capture, detections)
+    if framed is None:  # User quit the preview window
+        return False
+
+    sio.speak(Phrases.HOLD_STILL)
+    time.sleep(HOLD_STILL_DELAY_SECONDS)
+    framed = camera.capture_image()  # re-capture after the pause, not the stale frame
+    CAPTURES_DIR.mkdir(exist_ok=True)
+    filename = CAPTURES_DIR / f"capture_{datetime.now():%Y%m%d_%H%M%S}.jpg"
+    cv2.imwrite(str(filename), framed)
+    sio.speak(Phrases.SAVED)
+    print(f"Saved {filename}")
+
+    sio.speak(Phrases.PROMPT_RETRY_OR_DONE)
+    response = sio.listen()
+    return response is not None and "retry" in response
+
+
 def main() -> None:
 
     # Debug
@@ -158,63 +238,10 @@ def main() -> None:
     sio: SpeechIO = SpeechIO(voice_index=args.voice,
                              rate=args.rate)
 
-    # 1. Capture image
-    capture = camera.capture_image()
-
-    # 2. Detect objects
-    result, detections = detector.detect(capture)
-    # if args.gui:
-    cv2.imshow("Detections", overlays.overlay_regions(
-        result.plot(), camera.regions))
-    cv2.waitKey(1)
-
-    # 3. List detected objects, deduplicated but kept in detection order
-    objects = list(dict.fromkeys(label for label, _, _ in detections))
-    if not objects:
-        sio.speak(Phrases.NO_OBJECTS)
-        return
-    sio.speak(Phrases.LIST_OBJECTS + ", ".join(objects))
-    sio.speak(Phrases.PROMPT_CHOOSE_OBJECT)
-
-
-    # 5. Get user object choice
-    target_label = sio.make_choice(choices=objects,
-                                   invalid_response=Phrases.INVALID_RESPONSE)
-
-    # 6. Ask object framing
-    sio.speak(Phrases.PROMPT_CHOOSE_REGION +
-              target_label + ": " + ", ".join(camera.region_names))
-
-    # 7. Get user framing region choice
-    region_name = sio.make_choice(choices=camera.region_names,
-                                  invalid_response=Phrases.INVALID_RESPONSE)
-    sio.speak(f"You chose: {region_name}")
-
-    # 8. Calculate object area % in frame
-    frame_region = camera.regions[region_name]
-    detection_region = next((d[1] for d in detections if d[0] == target_label), None)
-    if detection_region is not None:
-        area_percent = framing.overlap_ratio(detection_region, frame_region) * 100
-        sio.speak(f"{Phrases.REPORT_OBJECT_AREA}{area_percent:.0f}"
-                  f" percent of the {region_name} region.")
-
-    # TODO: ensure that if chosen object bounding box is contained within the overall image but envelops the framing region that that is still considered a successful framing
-    # 9-15. Guide the user until the object sits in the chosen region, then
-    # capture. Steps 9 through 15 all live inside this loop: it measures
-    # coverage, speaks a direction, and re-detects on the next frame.
-    framed = guide_to_capture(camera, detector, sio, target_label,
-                              region_name, capture, detections)
-    if framed is None:  # User quit the preview window
-        return
-
-    sio.speak(Phrases.HOLD_STILL)
-    time.sleep(HOLD_STILL_DELAY_SECONDS)
-    framed = camera.capture_image()  # re-capture after the pause, not the stale frame
-    CAPTURES_DIR.mkdir(exist_ok=True)
-    filename = CAPTURES_DIR / f"capture_{datetime.now():%Y%m%d_%H%M%S}.jpg"
-    cv2.imwrite(str(filename), framed)
-    sio.speak(Phrases.SAVED)
-    print(f"Saved {filename}")
+    # Choose object + region, guide into position, and save. Loops again if
+    # the user says "retry" once a photo has been saved.
+    while run_capture_session(camera, detector, sio):
+        pass
 
 
 if __name__ == "__main__":
