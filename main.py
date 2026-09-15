@@ -10,7 +10,7 @@ from detector import Detector, Detection
 from speech_io import SpeechIO
 from argparse import Namespace  # Type hinting for argparse arguments
 from cv2.typing import MatLike  # Type hinting for cv2 images and matrices
-from enum import StrEnum
+from enum import Enum, StrEnum
 from camera import Camera
 
 # Tuple: ("<flag>", "<help message>")
@@ -41,10 +41,9 @@ OUTPUT_FILE = "capture.jpg"
 # motion from the camera or the object has settled and the shot isn't blurry.
 HOLD_STILL_DELAY_SECONDS = 2.0
 
-# Collection of TTS phrases
-
 
 class Phrases(StrEnum):
+    """Collection of TTS phrases"""
     LIST_OBJECTS = "The detected objects were "
     PROMPT_CHOOSE_OBJECT = "Which object would you like to frame?"
     PROMPT_RETRY_OBJECT = "Say 'try again' to retry."
@@ -56,6 +55,17 @@ class Phrases(StrEnum):
     HOLD_STILL = "Good. Capturing image. Hold still."
     SAVED = "Picture saved."
     PROMPT_RETRY_OR_DONE = "Say 'try again' to take another photo or say 'done' to finish."
+
+
+class InteractionPhrases(Enum):
+    """Collection of valid program interaction phrases (synonyms per intent)."""
+    TRY_AGAIN = ("try again", "retry", "again")
+    DONE = ("done", "finish", "close", "quit")
+
+
+def _has_said(response: str, phrases: InteractionPhrases) -> bool:
+    """True if any synonym in `phrases` appears in `response`."""
+    return any(phrase in response for phrase in phrases.value)
 
 
 def get_args() -> Namespace:
@@ -144,7 +154,8 @@ def choose_object_or_retry(camera: Camera,
     while True:
         capture = camera.capture_image()
         result, detections = detector.detect(capture)
-        cv2.imshow("Detections", overlays.overlay_regions(result.plot(), camera.regions))
+        cv2.imshow("Detections", overlays.overlay_regions(
+            result.plot(), camera.regions))
         cv2.waitKey(1)
 
         objects = list(dict.fromkeys(label for label, _, _ in detections))
@@ -157,11 +168,12 @@ def choose_object_or_retry(camera: Camera,
 
         response = sio.listen()
         while response is None or not (
-                "try again" in response or any(obj in response for obj in objects)):
+                _has_said(response, InteractionPhrases.TRY_AGAIN) or
+                any(obj in response for obj in objects)):
             sio.speak(Phrases.INVALID_RESPONSE)
             response = sio.listen()
 
-        if "try again" in response:
+        if _has_said(response, InteractionPhrases.TRY_AGAIN):
             continue
 
         return capture, detections, next(obj for obj in objects if obj in response)
@@ -176,7 +188,8 @@ def run_capture_session(camera: Camera, detector: Detector, sio: SpeechIO,
     Returns True if the user asked to retry with a new photo afterward,
     False if the session ended (quit the preview window, or declined retry).
     """
-    capture, detections, target_label = choose_object_or_retry(camera, detector, sio)
+    capture, detections, target_label = choose_object_or_retry(
+        camera, detector, sio)
 
     sio.speak(Phrases.PROMPT_CHOOSE_REGION +
               target_label + ": " + ", ".join(camera.region_names))
@@ -185,9 +198,11 @@ def run_capture_session(camera: Camera, detector: Detector, sio: SpeechIO,
     sio.speak(f"You chose: {region_name}")
 
     frame_region = camera.regions[region_name]
-    detection_region = next((d[1] for d in detections if d[0] == target_label), None)
+    detection_region = next(
+        (d[1] for d in detections if d[0] == target_label), None)
     if detection_region is not None:
-        area_percent = framing.overlap_ratio(detection_region, frame_region) * 100
+        area_percent = framing.overlap_ratio(
+            detection_region, frame_region) * 100
         sio.speak(f"{Phrases.REPORT_OBJECT_AREA}{area_percent:.0f}"
                   f" percent of the {region_name} region.")
 
@@ -208,7 +223,12 @@ def run_capture_session(camera: Camera, detector: Detector, sio: SpeechIO,
 
     sio.speak(Phrases.PROMPT_RETRY_OR_DONE)
     response = sio.listen()
-    return response is not None and "try again" in response
+    while response is None or not (
+            _has_said(response, InteractionPhrases.TRY_AGAIN) or
+            _has_said(response, InteractionPhrases.DONE)):
+        sio.speak(Phrases.INVALID_RESPONSE)
+        response = sio.listen()
+    return _has_said(response, InteractionPhrases.TRY_AGAIN)
 
 
 def main() -> None:
